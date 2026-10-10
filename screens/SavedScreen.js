@@ -1,8 +1,9 @@
-
 import { StyleSheet, Text, View, FlatList } from 'react-native';
 import colors from '../utils/colors';
 import TranslationResult from '../components/TranslationResult';
 import { useSelector } from 'react-redux';
+//actionı import edelim
+import { removeSavedItem } from '../store/savedItemsSlice';
 
 
 
@@ -21,7 +22,7 @@ export default function SavedScreen() {
       <FlatList
             data={savedItems.slice().reverse()}
             renderItem={itemData => {
-              return <TranslationResult itemId={itemData.item.id}/>
+              return <TranslationResult itemId={itemData.item.id} showDelete={false}/>
             }}
           />
     </View>

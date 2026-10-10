@@ -28,7 +28,7 @@ export default SettingsItem;
 
 const styles = StyleSheet.create({
     container: {
-        flexDirection: 'row',
+        flexDirection: 'row', //içindeki elemanların hangi yönde dizileceğini belirler.varsayılan column yani alt alta dizilmedir.
         backgroundColor: 'white',
         borderColor: colors.lightGrey,
         borderWidth: 0.5,

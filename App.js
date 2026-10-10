@@ -14,10 +14,9 @@ import * as Font from 'expo-font';
 import colors from './utils/colors';
 import LanguageSelectScreen from './screens/LanguageSelectScreen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as Notifications from 'expo-notifications';
 import { Provider } from 'react-redux';
-import store from './store/store';
-// import AsyncStorage  from '@react-native-async-storage/async-storage';
-// AsyncStorage.clear();
+import store from './store/store.js';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,8 +24,6 @@ const Tab = createBottomTabNavigator();
 
 const TabNavigator = () => {
   return (
-    
-    <Provider store={store}>
     <Tab.Navigator
       screenOptions={{
         headerShown: false
@@ -68,8 +65,6 @@ const TabNavigator = () => {
       />
 
     </Tab.Navigator>
-    </Provider>
-    
   )
 }
 
@@ -105,9 +100,15 @@ export default function App() {
       }
       
     };
-
     prepare();
   },[]);
+
+  useEffect(()=>{
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      NavigationContainerRefContext.navigate('Practice');
+    });
+    return () => subscription.remove();
+  }, []);
 
   const onLayout = useCallback(async()=>{
     if (appIsLoaded) {
@@ -121,6 +122,7 @@ export default function App() {
   }
 
   return (
+    <Provider store={store}>
     <NavigationContainer>
     <View onLayout={onLayout} style={{flex:1}}>
       <Stack.Navigator
@@ -155,6 +157,7 @@ export default function App() {
               color: colors.textColor,
               fontFamily: 'medium'
             }
+          
           }}
         >
           <Stack.Screen
@@ -167,6 +170,7 @@ export default function App() {
       </Stack.Navigator>
     </View>
     </NavigationContainer>
+    </Provider>
   );
 }
 

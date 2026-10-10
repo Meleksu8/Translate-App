@@ -1,8 +1,8 @@
-
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native"
 import { Feather } from '@expo/vector-icons';
 import colors from "../utils/colors";
 
+//language select screendeki her bir dil için (onpress ve nasıl durduğu vs.)
 const LanguageItem = props => {
 
     return <TouchableOpacity

@@ -1,4 +1,3 @@
-
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import colors from '../utils/colors';
 import SettingsItem from '../components/SettingsItem';

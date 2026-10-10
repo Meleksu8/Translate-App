@@ -1,21 +1,28 @@
-
-import {  StyleSheet, Text,TextInput, TouchableOpacity, View } from 'react-native';
+import {  StyleSheet, Text,TextInput, TouchableOpacity, View, ActivityIndicator, FlatList } from 'react-native';
 import colors from '../utils/colors';
 import {AntDesign, Ionicons, MaterialIcons} from '@expo/vector-icons';
 import { useEffect, useState, useCallback } from 'react';
 import supportedLanguages from '../utils/supportedLanguages';
 import { translate } from '../utils/translate';
-import { ActivityIndicator } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useDispatch, useSelector } from 'react-redux';
 import { addHistoryItem, setHistoryItems } from '../store/historySlice';
 import TranslationResult from '../components/TranslationResult';
 import uuid from 'react-native-uuid';
-import { FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setSavedItems } from '../store/savedItemsSlice';
+import * as Notifications from 'expo-notifications';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
+//history ve savedItemsı uygulama açıldığında hafızadan okuyup Redux stateine yükleyen
+// bir Redux Thunk (Asenkron işlem) fonksiyonudur.
 const loadData = () => {
     return async dispatch => {
       try {
@@ -38,6 +45,7 @@ const loadData = () => {
 }
 
 export default function HomeScreen(props) {
+  const params = props.route.params || {};
   const dispatch = useDispatch();
   const history = useSelector(state => state.history.items);
   const [enteredText, setEnteredText] = useState("");
@@ -47,10 +55,20 @@ export default function HomeScreen(props) {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(()=>{
+    if (params.languageTo) {
+      setLanguageTo(params.languageTo);
+    }
+    if (params.languageFrom) {
+      setLanguageFrom(params.languageFrom);
+    }
+  }, [params.languageTo, params.languageFrom]);
+
+  //disatch referansı hiç değişmeyeceği için uygulama açıldığında bir kez çalışır.
+  useEffect(()=>{
     dispatch(loadData());
   }, [dispatch]);
 
-
+  //yerel diski(historyi güncel tutmak)
   useEffect(()=>{
     const saveHistory = async () => {
       try {
@@ -61,6 +79,44 @@ export default function HomeScreen(props) {
     }
      saveHistory();
   }, [history]);
+
+  //Eğer geçmiş tamamen temizlendiyse ana ekrandaki metin kutuları sıfırlanacak
+  useEffect(()=>{
+    if (history.length === 0) {
+      setEnteredText("");
+      setResultText("");
+    }
+  }, [history]);
+  
+  //Geçmişten rastgele bir kelime seçip bildirim kuran fonksiyon
+  const scheduleWordReminder = useCallback(async (currentHistory, frequencyInHours=24)=>{
+    if (!currentHistory || currentHistory.length === 0) return;
+
+    //Bildirim izni isteme
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') return ;
+
+    //Geçmişten rastgele bir öğe seç
+    const randomItem = currentHistory[Math.floor(Math.random() * currentHistory.length)];
+    const originalText = randomItem.original_text || randomItem.text;
+    const translatedText = randomItem.translated_text ? randomItem.translated_text[randomItem.to] : "";
+
+    //Eski zamanlanmış bildirimleri temizle
+    await Notifications.cancelAllScheduledNotificationsAsync();
+
+    //şimdilik 10 saniye
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Kelime Hatırlatıcı",
+        body: `"${originalText}"->${translatedText}`,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: frequencyInHours * 1800,
+        repeats: false,
+      },
+    });
+  }, []);
 
   const onSubmit = useCallback(async () => {
 
@@ -79,6 +135,9 @@ export default function HomeScreen(props) {
       result.dateTime = new Date().toISOString();
 
       dispatch(addHistoryItem({item: result}));
+
+      //4. Çeviri yapıldığında yeni geçmişle birlikte bildirimi kur
+      scheduleWordReminder([...history, result]);
       
     } catch (error) {
       console.log(error);
@@ -87,11 +146,16 @@ export default function HomeScreen(props) {
       setIsLoading(false);
     }
     
-  }, [enteredText, languageTo, languageFrom, dispatch])
+  }, [enteredText, languageTo, languageFrom, dispatch, history, scheduleWordReminder]);
 
   const copyToClipboard = useCallback(async ()=>{
      await Clipboard.setStringAsync(resultText);
   }, [resultText]);
+
+  const swapLanguages = useCallback(()=>{
+    setLanguageFrom(languageTo);
+    setLanguageTo(languageFrom);
+  }, [languageFrom, languageTo]);
 
   return (
 
@@ -99,17 +163,19 @@ export default function HomeScreen(props) {
       <View style={styles.languageContainer}>
         <TouchableOpacity
           style={styles.languageOption}
-          onPress={()=> props.navigation.navigate("languageSelect", {title: "Translate from", selected: languageFrom, onSelect: (lang)=>setLanguageFrom(lang)})}>
+          onPress={()=> props.navigation.navigate("languageSelect", {title: "Translate from", selected: languageFrom, mode: 'from'})}>
           <Text style={styles.languageOptionText}>{supportedLanguages[languageFrom]}</Text>
         </TouchableOpacity>
 
-        <View style={styles.arrowContainer}>
-          <AntDesign name="arrow-right" size={24} color={colors.lightGrey} />
-        </View>
+        <TouchableOpacity
+          style={styles.arrowContainer}
+          onPress={swapLanguages}>
+          <AntDesign name="arrow-right" size={24} color={colors.primary} />
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.languageOption}
-          onPress={()=> props.navigation.navigate("languageSelect", {title: "Translate to", selected: languageTo, onSelect: (lang)=> setLanguageTo(lang)})}>
+          onPress={()=> props.navigation.navigate("languageSelect", {title: "Translate to", selected: languageTo, mode: 'to'})}>
           <Text style={styles.languageOptionText}>{supportedLanguages[languageTo]}</Text>
         </TouchableOpacity>
       </View>
@@ -117,7 +183,9 @@ export default function HomeScreen(props) {
         <TextInput 
           multiline
           placeholder='Enter text'
+          placeholderTextColor={colors.primaryDisabled}
           style={styles.textInput}
+          value={enteredText}
           onChangeText={(text)=> setEnteredText(text)}
         />
         <TouchableOpacity
